@@ -255,23 +255,23 @@ db-destroy: ## destroys completly the database container with its data
 
 db-sql-install: ## installs postgres sql file into the container database to init a project from resources/database
 	$(MAKE) local-ownership-set;
-	$(DOCKER) exec -i $(DATABASE_CONTAINER) sh -c 'psql -d $(DATABASE_NAME) -U "$(DATABASE_USER)"' < $(ROOT_DIR)$(DATABASE_PATH)$(DATABASE_INIT)
+	$(DOCKER) exec -i $(DATABASE_CONTAINER) sh -c 'mysql -u "$(DATABASE_USER)" -d $(DATABASE_NAME)' < $(ROOT_DIR)$(DATABASE_PATH)$(DATABASE_INIT)
 	echo ${C_YEL}"$(PROJECT_NAME) DATABASE"${C_END}" has been copied to container from "${C_BLU}"$(DATABASE_PATH)$(DATABASE_INIT)"${C_END}
 
 db-sql-replace: ## replaces the container database with the latest postgres .sql backup file from resources/database
 	$(MAKE) local-ownership-set;
-	$(DOCKER) exec -i $(DATABASE_CONTAINER) sh -c 'psql -d $(DATABASE_NAME) -U "$(DATABASE_USER)"' < $(ROOT_DIR)$(DATABASE_PATH)$(DATABASE_BACK)
+	$(DOCKER) exec -i $(DATABASE_CONTAINER) sh -c 'mysql -u "$(DATABASE_USER)" -d $(DATABASE_NAME)' < $(ROOT_DIR)$(DATABASE_PATH)$(DATABASE_BACK)
 	echo ${C_YEL}"$(PROJECT_NAME) DATABASE"${C_END}" has been replaced from "${C_BLU}"$(DATABASE_PATH)$(DATABASE_BACK)"${C_END}
 
 db-sql-backup: ## copies the container database as postgres .sql backup file into resources/database
 	$(MAKE) local-ownership-set;
 	[ -d .$(DATABASE_PATH)$(DATABASE_BACK) ] || touch .$(DATABASE_PATH)$(DATABASE_BACK)
-	$(DOCKER) exec $(DATABASE_CONTAINER) sh -c 'pg_dump -d $(DATABASE_NAME) -U "$(DATABASE_USER)"' > $(ROOT_DIR)$(DATABASE_PATH)$(DATABASE_BACK)
+	$(DOCKER) exec $(DATABASE_CONTAINER) sh -c 'mysqldump -u "$(DATABASE_USER)" -d $(DATABASE_NAME)' > $(ROOT_DIR)$(DATABASE_PATH)$(DATABASE_BACK)
 	echo ${C_YEL}"$(PROJECT_NAME) DATABASE"${C_END}" backup has been created at "${C_BLU}"$(DATABASE_PATH)$(DATABASE_BACK)"${C_END}
 
 db-sql-drop: ## drops and creates the postgres database into the container for reseting
 	$(MAKE) local-ownership-set;
-	$(DOCKER) exec -i $(DATABASE_CONTAINER) sh -c 'dropdb -f $(DATABASE_NAME) -U "$(DATABASE_USER)"; createdb $(DATABASE_NAME) -U "$(DATABASE_USER)"'
+	$(DOCKER) exec -i $(DATABASE_CONTAINER) sh -c 'mysql -u "$(DATABASE_USER)" -p -e "DROP DATABASE IF EXISTS $(DATABASE_NAME); CREATE DATABASE $(DATABASE_NAME);"'
 	echo ${C_YEL}"$(PROJECT_NAME) DATABASE"${C_END}" in container "${C_YEL}"$(DATABASE_CONTAINER)"${C_END}" has been deleted."
 
 db-remote-copy: ## copies referenced remote database into resources/database/[file-name].sql file for local development
@@ -281,69 +281,14 @@ ifeq ($(DETECTED_OS), Windows)
 else
 	[ -d .$(DATABASE_PATH)$(DATABASE_INIT) ] || cat /dev/null > .$(DATABASE_PATH)$(DATABASE_INIT)
 endif
-	$(DOCKER) exec -i $(DATABASE_CONTAINER) sh -c 'PGPASSWORD=$(DATABASE_REMOTE_PASS) pg_dump -v $(DATABASE_REMOTE_CONN) > /var/tmp/$(DATABASE_INIT)';
+	$(DOCKER) exec -i $(DATABASE_CONTAINER) sh -c 'mysqldump -h $(DATABASE_REMOTE_CONN) -p $(DATABASE_REMOTE_PASS) > /var/tmp/$(DATABASE_INIT)';
 	$(DOCKER) cp $(DATABASE_CONTAINER):/var/tmp/$(DATABASE_INIT) $(ROOT_DIR)$(DATABASE_PATH)$(DATABASE_INIT);
 	$(DOCKER) exec -i $(DATABASE_CONTAINER) sh -c 'rm /var/tmp/$(DATABASE_INIT)';
 
 # -------------------------------------------------------------------------------------------------
-#  Tests
-# -------------------------------------------------------------------------------------------------
-.PHONY: test-base-up test-base-down test-base-full test-qa-full
-
-test-base-up: ## creates a side database for tests, executes migrations and default seeders, and optionally access the apirest container
-	$(DOCKER) exec -it $(DATABASE_CONTAINER) sh -c 'dropdb -f $(DATABASE_NAME)_testing -U "$(DATABASE_USER)"; createdb $(DATABASE_NAME)_testing -U "$(DATABASE_USER)"';
-	$(DOCKER) exec -it $(APIREST_CONTAINER) sh -c 'echo "Testing:"; \
-php artisan config:clear; \
-php artisan cache:clear; \
-php artisan route:clear; \
-composer dump-autoload; \
-php artisan --env=testing migrate; \
-php artisan --env=testing db:seed --class=TestBaseSeeder;';
-	echo ${C_YEL}"$(PROJECT_NAME) TESTING DATABASE"${C_END}" inside container "${C_YEL}"$(DATABASE_CONTAINER)"${C_END}" has been created."
-	@echo -n ${C_YEL}"Do you want to enter into the container to perform tests? "${C_END}"[Y/n]: " && read response && if [ $${response:-'n'} != 'Y' ]; then \
-        echo ${C_GRN}"OK!"${C_END}" Remember to drop testing database outside container: "${C_BLU}"$$ make test-base-down"${C_END}; \
-    else \
-		$(MAKE) apirest-ssh; \
-	fi
-
-test-base-down: ## drops the side database for testing
-	$(DOCKER) exec -it $(DATABASE_CONTAINER) sh -c 'dropdb -f $(DATABASE_NAME)_testing -U "$(DATABASE_USER)"';
-	echo ${C_YEL}"$(PROJECT_NAME) TESTING DATABASE"${C_END}" inside container "${C_YEL}"$(DATABASE_CONTAINER)"${C_END}" has been deleted."
-
-test-base-full: ## creates a side database for testing, executes full tests and drops the side database
-	$(DOCKER) exec -it $(DATABASE_CONTAINER) sh -c 'dropdb -f $(DATABASE_NAME)_testing -U "$(DATABASE_USER)"; createdb $(DATABASE_NAME)_testing -U "$(DATABASE_USER)"';
-	echo ${C_YEL}"$(PROJECT_NAME) TESTING DATABASE"${C_END}" inside container "${C_YEL}"$(DATABASE_CONTAINER)"${C_END}" has been created."
-	$(DOCKER) exec -it $(APIREST_CONTAINER) sh -c 'echo "Testing:"; \
-php artisan config:clear; \
-php artisan cache:clear; \
-php artisan route:clear; \
-composer dump-autoload; \
-php artisan --env=testing migrate; \
-php artisan --env=testing db:seed --class=TestBaseSeeder; \
-php artisan test --bail --profile;';
-	echo ${C_YEL}"$(PROJECT_NAME) TESTING DATABASE"${C_END}" inside container "${C_YEL}"$(DATABASE_CONTAINER)"${C_END}" has persisted data until next testing execution."
-
-test-qa-full: ## perform tests on the regular database
-	@echo ${C_YEL}"$(PROJECT_NAME) TESTING"${C_END}" are going to be performed by "${C_YEL}".env.testing"${C_END}" settings."
-	@echo ${C_YEL}"Thus, the automated tests will use the data from the database that has been set, performing new migrations and seedings."${C_END}
-	@echo -n ${C_YEL}"Do you want to proceed with tests? [Y/n]: "${C_END} && read response && if [ "$${response:-n}" != "Y" ]; then \
-		echo ${C_GRN}"OK! Automated tests have been stopped."${C_END}; \
-	else \
-		$(DOCKER) exec -it $(APIREST_CONTAINER) sh -c '\
-php artisan config:clear; \
-php artisan cache:clear; \
-php artisan route:clear; \
-composer dump-autoload; \
-php artisan --env=testing migrate; \
-php artisan --env=testing db:seed; \
-php artisan test --bail --profile'; \
-		echo ${C_YEL}"$(PROJECT_NAME) AUTOMATED TESTS"${C_END}" finished."; \
-	fi
-
-# -------------------------------------------------------------------------------------------------
 #  Remote - Requires local SSH-KEY
 # -------------------------------------------------------------------------------------------------
-.PHONY: remote-dev remote-dev-space remote-test remote-stage
+.PHONY: remote-dev
 
 remote-dev: ## opens session into development server changing directory into developer's workspace
 	ssh -v -o IdentitiesOnly=yes -i "$(APIREST_REMOTE_DEV_KEY)" $(APIREST_REMOTE_DEV_SSH) -t 'cd $(APIREST_REMOTE_DEV_DIR); bash --login'
