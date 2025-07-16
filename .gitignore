@@ -30,8 +30,8 @@ dist-ssr
 # Project
 /apirest/*
 !/apirest/.gitignore
-/infrastructure/mariadb-11.8/data
-/infrastructure/nginx-php/docker/config
+/platform/mariadb-11.8/data
+/platform/nginx-php/docker/config
 /resources/database/*
 /Makefile
 /jenkis-*
