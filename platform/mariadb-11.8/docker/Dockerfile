@@ -131,6 +131,7 @@ RUN set -ex; \
 		sed -i -e '/includedir/ {N;s/\(.*\)\n\(.*\)/\n\2\n\1/}' /etc/mysql/mariadb.cnf; \
 	fi
 
+RUN chown -R mysql:mysql /var/lib/mysql
 
 VOLUME /var/lib/mysql
 
