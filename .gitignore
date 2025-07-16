@@ -27,7 +27,6 @@ dist
 dist-ssr
 *.local
 
-/apirest/*
 /vault
 /infrastructure/pgsql-16/data
 /infrastructure/nginx-php/docker/config
