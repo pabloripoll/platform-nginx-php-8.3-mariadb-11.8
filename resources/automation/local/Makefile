@@ -255,7 +255,7 @@ db-destroy: ## destroys completly the database container with its data
 
 db-sql-install: ## installs postgres sql file into the container database to init a project from resources/database
 	$(MAKE) local-ownership-set;
-	$(DOCKER) exec -i $(DATABASE_CONTAINER) sh -c 'mysql -u "$(DATABASE_USER)" -d $(DATABASE_NAME)' < $(ROOT_DIR)$(DATABASE_PATH)$(DATABASE_INIT)
+	$(DOCKER) exec -i $(DATABASE_CONTAINER) sh -c 'mysql -u "$(DATABASE_ROOT)" -p$(DATABASE_ROOT) -d $(DATABASE_NAME)' < $(ROOT_DIR)$(DATABASE_PATH)$(DATABASE_INIT)
 	echo ${C_YEL}"$(PROJECT_NAME) DATABASE"${C_END}" has been copied to container from "${C_BLU}"$(DATABASE_PATH)$(DATABASE_INIT)"${C_END}
 
 db-sql-replace: ## replaces the container database with the latest postgres .sql backup file from resources/database
