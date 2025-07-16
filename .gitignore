@@ -27,7 +27,9 @@ dist
 dist-ssr
 *.local
 
+# Project
 /apirest/*
+!/apirest/.gitignore
 /infrastructure/mariadb-11.8/data
 /infrastructure/nginx-php/docker/config
 /resources/database/*
