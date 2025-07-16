@@ -21,7 +21,7 @@ endif
 include .env
 
 APIREST_BRANCH:=develop
-APIREST_PROJECT:=$(PROJECT_NAME) - APIREST
+APIREST_PROJECT:=$(PROJECT_NAME)
 APIREST_CONTAINER:=$(addsuffix -$(APIREST_CAAS), $(PROJECT_LEAD))
 
 DATABASE_CONTAINER:=$(addsuffix -$(DATABASE_CAAS), $(PROJECT_LEAD))
@@ -251,41 +251,70 @@ db-destroy: ## destroys completly the database container with its data
 		fi \
 	fi
 
-.PHONY: db-sql-install db-sql-replace db-sql-backup db-sql-remote db-copy-remote
+.PHONY: db-sql-install db-sql-install-clear db-sql-replace db-sql-backup db-sql-backup-clear db-sql-drop db-remote-host-copy db-remote-file-copy
 
-db-sql-install: ## installs postgres sql file into the container database to init a project from resources/database
+db-sql-install: ## imports [file-name].sql file into database container as an initial project database located in ./resources/database/
 	$(MAKE) local-ownership-set;
 	$(DOCKER) exec -i $(DATABASE_CONTAINER) sh -c 'chown -R mysql:mysql /var/lib/mysql'
-	$(DOCKER) exec -i $(DATABASE_CONTAINER) sh -c 'mariadb -u "$(DATABASE_USER)" -p$(DATABASE_PASS) -d $(DATABASE_NAME)' < $(ROOT_DIR)$(DATABASE_PATH)$(DATABASE_INIT)
+	$(DOCKER) exec -i $(DATABASE_CONTAINER) sh -c 'mariadb -v -u "$(DATABASE_USER)" -p$(DATABASE_PASS) -D $(DATABASE_NAME)' < $(ROOT_DIR)$(DATABASE_PATH)$(DATABASE_INIT)
 	echo ${C_YEL}"$(PROJECT_NAME) DATABASE"${C_END}" has been copied to container from "${C_BLU}"$(DATABASE_PATH)$(DATABASE_INIT)"${C_END}
 
-db-sql-replace: ## replaces the container database with the latest postgres .sql backup file from resources/database
+db-sql-install-clear: ## clears up the [file-name].sql file as an initial project database located in ./resources/database/
+ifeq ($(DETECTED_OS), Windows)
+	if not exist "$(ROOT_DIR)$(DATABASE_PATH)$(DATABASE_INIT)" type nul > "$(ROOT_DIR)$(DATABASE_PATH)$(DATABASE_INIT)"
+else
+	[ -d "$(ROOT_DIR)$(DATABASE_PATH)$(DATABASE_INIT)" ] || cat /dev/null > "$(ROOT_DIR)$(DATABASE_PATH)$(DATABASE_INIT)"
+endif
+
+db-sql-replace: ## replaces the database container with the located in ./resources/database/[file-name].sql file
 	$(MAKE) local-ownership-set;
-	$(DOCKER) exec -i $(DATABASE_CONTAINER) sh -c 'mysql -u "$(DATABASE_USER)" -d $(DATABASE_NAME)' < $(ROOT_DIR)$(DATABASE_PATH)$(DATABASE_BACK)
+	$(DOCKER) exec -i $(DATABASE_CONTAINER) sh -c 'mariadb -v -u "$(DATABASE_USER)" -p$(DATABASE_PASS) -D $(DATABASE_NAME)' < $(ROOT_DIR)$(DATABASE_PATH)$(DATABASE_BACK)
 	echo ${C_YEL}"$(PROJECT_NAME) DATABASE"${C_END}" has been replaced from "${C_BLU}"$(DATABASE_PATH)$(DATABASE_BACK)"${C_END}
 
-db-sql-backup: ## copies the container database as postgres .sql backup file into resources/database
-	$(MAKE) local-ownership-set;
-	[ -d .$(DATABASE_PATH)$(DATABASE_BACK) ] || touch .$(DATABASE_PATH)$(DATABASE_BACK)
-	$(DOCKER) exec $(DATABASE_CONTAINER) sh -c 'mysqldump -u "$(DATABASE_USER)" -d $(DATABASE_NAME)' > $(ROOT_DIR)$(DATABASE_PATH)$(DATABASE_BACK)
-	echo ${C_YEL}"$(PROJECT_NAME) DATABASE"${C_END}" backup has been created at "${C_BLU}"$(DATABASE_PATH)$(DATABASE_BACK)"${C_END}
-
-db-sql-drop: ## drops and creates the postgres database into the container for reseting
-	$(MAKE) local-ownership-set;
-	$(DOCKER) exec -i $(DATABASE_CONTAINER) sh -c 'mariadb -u "$(DATABASE_USER)" -p$(DATABASE_PASS) -e "DROP DATABASE IF EXISTS $(DATABASE_NAME);"'
-	$(DOCKER) exec -i $(DATABASE_CONTAINER) sh -c 'mariadb -u "$(DATABASE_USER)" -p$(DATABASE_PASS) -e "CREATE DATABASE IF NOT EXISTS $(DATABASE_NAME);"'
-	echo ${C_YEL}"$(PROJECT_NAME) DATABASE"${C_END}" in container "${C_YEL}"$(DATABASE_CONTAINER)"${C_END}" has been deleted."
-
-db-remote-copy: ## copies referenced remote database into resources/database/[file-name].sql file for local development
+db-sql-backup: ## exports into [file-name].sql file the project database backup into ./resources/database/
 	$(MAKE) local-ownership-set;
 ifeq ($(DETECTED_OS), Windows)
-	[ IF exist .$(DATABASE_PATH)$(DATABASE_INIT)/nul ] || type nul > .$(DATABASE_PATH)$(DATABASE_INIT)
+	if not exist "$(ROOT_DIR)$(DATABASE_PATH)$(DATABASE_BACK)" type nul > "$(ROOT_DIR)$(DATABASE_PATH)$(DATABASE_BACK)"
 else
-	[ -d .$(DATABASE_PATH)$(DATABASE_INIT) ] || cat /dev/null > .$(DATABASE_PATH)$(DATABASE_INIT)
+	[ -d "$(ROOT_DIR)$(DATABASE_PATH)$(DATABASE_BACK)" ] || cat /dev/null > "$(ROOT_DIR)$(DATABASE_PATH)$(DATABASE_BACK)"
 endif
-	$(DOCKER) exec -i $(DATABASE_CONTAINER) sh -c 'mysqldump -h $(DATABASE_REMOTE_CONN) -p $(DATABASE_REMOTE_PASS) > /var/tmp/$(DATABASE_INIT)';
+	$(DOCKER) exec -i $(DATABASE_CONTAINER) sh -c 'chown -R mysql:mysql /var/lib/mysql'
+	$(DOCKER) exec $(DATABASE_CONTAINER) sh -c 'mariadb-dump -u "$(DATABASE_USER)" -p$(DATABASE_PASS) $(DATABASE_NAME)' > $(ROOT_DIR)$(DATABASE_PATH)$(DATABASE_BACK)
+	echo ${C_YEL}"$(PROJECT_NAME) DATABASE"${C_END}" backup has been created at "${C_BLU}"$(DATABASE_PATH)$(DATABASE_BACK)"${C_END}
+
+db-sql-backup-clear: ## clears up the project database backup [file-name].sql file located in ./resources/database/
+ifeq ($(DETECTED_OS), Windows)
+	if not exist "$(ROOT_DIR)$(DATABASE_PATH)$(DATABASE_BACK)" type nul > "$(ROOT_DIR)$(DATABASE_PATH)$(DATABASE_BACK)"
+else
+	[ -d "$(ROOT_DIR)$(DATABASE_PATH)$(DATABASE_BACK)" ] || cat /dev/null > "$(ROOT_DIR)$(DATABASE_PATH)$(DATABASE_BACK)"
+endif
+
+db-sql-drop: ## drops the current database and creates an empty new one inside the container
+	$(MAKE) local-ownership-set;
+	$(DOCKER) exec -i $(DATABASE_CONTAINER) sh -c 'mariadb -v -u "$(DATABASE_USER)" -p$(DATABASE_PASS) -e "DROP DATABASE IF EXISTS $(DATABASE_NAME);"'
+	$(DOCKER) exec -i $(DATABASE_CONTAINER) sh -c 'mariadb -v -u "$(DATABASE_USER)" -p$(DATABASE_PASS) -e "CREATE DATABASE IF NOT EXISTS $(DATABASE_NAME);"'
+	echo ${C_YEL}"$(PROJECT_NAME) DATABASE"${C_END}" in container "${C_YEL}"$(DATABASE_CONTAINER)"${C_END}" has been deleted."
+
+db-remote-host-copy: ## copies referenced remote database by tcp connection into resources/database/[file-name].sql for local development
+	$(MAKE) local-ownership-set;
+ifeq ($(DETECTED_OS), Windows)
+	if not exist "$(ROOT_DIR)$(DATABASE_PATH)$(DATABASE_INIT)" type nul > "$(ROOT_DIR)$(DATABASE_PATH)$(DATABASE_INIT)"
+else
+	[ -d "$(ROOT_DIR)$(DATABASE_PATH)$(DATABASE_INIT)" ] || cat /dev/null > "$(ROOT_DIR)$(DATABASE_PATH)$(DATABASE_INIT)"
+endif
+	$(DOCKER) exec -i $(DATABASE_CONTAINER) sh -c 'mariadb-dump -v -h $(DATABASE_REMOTE_CONN) -p$(DATABASE_REMOTE_PASS) > /var/tmp/$(DATABASE_INIT)';
 	$(DOCKER) cp $(DATABASE_CONTAINER):/var/tmp/$(DATABASE_INIT) $(ROOT_DIR)$(DATABASE_PATH)$(DATABASE_INIT);
 	$(DOCKER) exec -i $(DATABASE_CONTAINER) sh -c 'rm /var/tmp/$(DATABASE_INIT)';
+
+db-remote-file-copy: ## copies referenced remote database file into resources/database/[file-name].sql for local development
+	$(MAKE) local-ownership-set;
+ifeq ($(DETECTED_OS), Windows)
+	if not exist "$(ROOT_DIR)$(DATABASE_PATH)$(DATABASE_INIT)" type nul > "$(ROOT_DIR)$(DATABASE_PATH)$(DATABASE_INIT)"
+else
+	[ -d "$(ROOT_DIR)$(DATABASE_PATH)$(DATABASE_INIT)" ] || cat /dev/null > "$(ROOT_DIR)$(DATABASE_PATH)$(DATABASE_INIT)"
+endif
+	ssh -v $(APIREST_REMOTE_SSH) -t 'cd $(APIREST_REMOTE_DIR); bash dump_mariadb.sh';
+	scp -v $(DATABASE_REMOTE_FILE) $(ROOT_DIR)$(DATABASE_PATH)$(DATABASE_INIT);
 
 # -------------------------------------------------------------------------------------------------
 #  Remote - Requires local SSH-KEY
@@ -293,7 +322,7 @@ endif
 .PHONY: remote-dev
 
 remote-dev: ## opens session into development server changing directory into developer's workspace
-	ssh -v -o IdentitiesOnly=yes -i "$(APIREST_REMOTE_DEV_KEY)" $(APIREST_REMOTE_DEV_SSH) -t 'cd $(APIREST_REMOTE_DEV_DIR); bash --login'
+	ssh -v -o IdentitiesOnly=yes -i "$(APIREST_REMOTE_KEY)" $(APIREST_REMOTE_SSH) -t 'cd $(APIREST_REMOTE_DIR); bash --login'
 
 # -------------------------------------------------------------------------------------------------
 #  Repository Helper
