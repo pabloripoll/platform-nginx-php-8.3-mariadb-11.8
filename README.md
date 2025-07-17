@@ -22,6 +22,11 @@ Create the local .env file from the example *(remove its description comments)*
 $ cp .env.example .env
 ```
 
+Create the local project directory that is bonded with the container
+```bash
+$ mkdir ./apirest
+```
+
 Now, Makefile recipes can be executed
 
 See the list of recipes with their usage description
