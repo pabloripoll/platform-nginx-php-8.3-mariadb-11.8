@@ -29,7 +29,7 @@ dist-ssr
 
 # Project
 /apirest/*
-!/apirest/.gitignore
+#!/apirest/.gitignore
 /platform/mariadb-11.8/data
 /platform/nginx-php/docker/config
 /resources/database/*
