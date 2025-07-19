@@ -31,6 +31,7 @@ dist-ssr
 /apirest/*
 /platform/mariadb-11.8/data
 /platform/nginx-php/docker/config
+/platform/nginx-php/docker/Dockerfile
 /resources/database/*.sql
 /Makefile
 /jenkis-*

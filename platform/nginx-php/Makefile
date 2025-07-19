@@ -31,6 +31,8 @@ DOCKER_PORT=$(APIREST_PORT)
 DOCKER_BIND=$(APIREST_BIND)
 DOCKER_MEM=$(APIREST_CAAS_MEM)
 DOCKER_SWAP=$(APIREST_CAAS_SWAP)
+DOCKER_USER=$(APIREST_CAAS_USER)
+DOCKER_GROUP=$(APIREST_CAAS_GROUP)
 
 ROOT_DIR=$(patsubst %/,%,$(dir $(realpath $(firstword $(MAKEFILE_LIST)))))
 DIR_BASENAME=$(shell basename $(ROOT_DIR))
@@ -95,7 +97,9 @@ else
 	COMPOSE_PROJECT_PORT=$(DOCKER_PORT)\r\n\
 	COMPOSE_PROJECT_PATH=\"$(DOCKER_BIND)\"\r\n\
 	COMPOSE_PROJECT_MEM=\"$(DOCKER_MEM)\"\r\n\
-	COMPOSE_PROJECT_SWAP=\"$(DOCKER_SWAP)\"" > ./docker/.env; \
+	COMPOSE_PROJECT_SWAP=\"$(DOCKER_SWAP)\"\r\n\
+	COMPOSE_PROJECT_USER=\"$(DOCKER_USER)\"\r\n\
+	COMPOSE_PROJECT_GROUP=\"$(DOCKER_GROUP)\"" > ./docker/.env; \
 	echo ${C_BLU}"$(PROJECT_NAME)"${C_END}" APIREST - $(DOCKER_PLTF) "${C_YEL}"docker-compose.yml"${C_END}" .env file "${C_GRN}"has been set."${C_END};
 	echo ${C_BLU}"$(PROJECT_NAME)"${C_END}" APIREST - Max. memory usage: "${C_GRN}$(DOCKER_MEM)${C_END}
 	echo ${C_BLU}"$(PROJECT_NAME)"${C_END}" APIREST - Is going to be served at: "${C_GRN}http://127.0.0.1:$(DOCKER_PORT)${C_END}
