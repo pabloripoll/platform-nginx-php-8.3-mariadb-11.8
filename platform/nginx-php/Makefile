@@ -41,18 +41,11 @@ DOCKER_EXEC_SSH=$(DOCKER) exec -it $(DOCKER_CONTAINER) sh
 
 APPLICATION_UPDATE='composer update'
 APPLICATION_INSTALL='composer install'
-APPLICATION_INSTALL_BASE='composer create-project laravel/laravel:^10 .'
-APPLICATION_INSTALL_PACKAGES='composer require tymon/jwt-auth && \
-composer require laravel/pint --dev && \
-composer require --dev phpstan/phpstan && \
-composer require zircote/swagger-php && \
-composer require maatwebsite/excel && \
-composer require auth0/login && \
-composer require auth0/auth0-php && \
-composer require kreait/laravel-firebase && \
-composer require sentry/sentry-laravel && \
-composer require stevebauman/location &&  \
-composer require symfony/mailgun-mailer'
+APPLICATION_INSTALL_BASE='composer create-project [package]'
+APPLICATION_INSTALL_PACKAGES='composer require [package] && \
+composer require [package] --dev && \
+composer require [package] --dev && \
+composer require [package]'
 
 # -------------------------------------------------------------------------------------------------
 #  Help
@@ -140,7 +133,7 @@ stop: ## stops the running container but data won't be destroyed
 	cd docker && $(DOCKER_COMPOSE) stop
 
 restart: ## execute this Makefile "stop" & "start" recipes
-	$(MAKE) stop start
+	cd docker && $(DOCKER) $(DOCKER_CONTAINER) restart
 
 clear: ## removes container from Docker running containers
 	cd docker && $(DOCKER_COMPOSE) kill || true
@@ -180,9 +173,12 @@ app-install-packages: ## installs the dependencies packages required from projec
 
 nginx-conf: ## shows NGINX server block on running container
 	$(DOCKER) exec -i $(DOCKER_CONTAINER) sh -c 'cat /etc/nginx/conf.d/default.conf'
+	$(MAKE) restart
 
 php-conf: ## shows PHP configuration on running container
 	$(DOCKER) exec -i $(DOCKER_CONTAINER) sh -c 'cat /etc/php83/conf.d/custom.ini'
+	$(MAKE) restart
 
 php-fpm-conf: ## shows PHP-FPM configuration on running container
 	$(DOCKER) exec -i $(DOCKER_CONTAINER) sh -c 'cat /etc/php83/php-fpm.d/www.conf'
+	$(MAKE) restart
