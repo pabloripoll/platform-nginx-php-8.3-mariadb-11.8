@@ -29,10 +29,9 @@ dist-ssr
 
 # Project
 /apirest/*
-#!/apirest/.gitignore
 /platform/mariadb-11.8/data
 /platform/nginx-php/docker/config
-/resources/database/*
+/resources/database/*.sql
 /Makefile
 /jenkis-*
 /vault
